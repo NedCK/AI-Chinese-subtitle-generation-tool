@@ -43,7 +43,7 @@ const App: React.FC = () => {
     setIsCopied(false);
 
     try {
-      setLoadingMessage('Step 1/3: Extracting and preparing audio...');
+      setLoadingMessage('Step 1/3: Analyzing and splitting audio file...');
       const audioChunks: AudioChunkData[] = await extractAudioChunks(videoFile, 15); // 15-second chunks
 
       if (audioChunks.length === 0) {
@@ -53,7 +53,7 @@ const App: React.FC = () => {
       let allSubtitles: SubtitleEntry[] = [];
       for (let i = 0; i < audioChunks.length; i++) {
           const chunk = audioChunks[i];
-          setLoadingMessage(`Step 2/3: Translating audio (Chunk ${i + 1} of ${audioChunks.length})...`);
+          setLoadingMessage(`Step 2/3: Processing audio chunk ${i + 1} of ${audioChunks.length}...`);
           
           const translatedText = await generateSubtitleForChunk(chunk);
 
@@ -67,7 +67,7 @@ const App: React.FC = () => {
           }
       }
       
-      setLoadingMessage('Step 3/3: Formatting subtitles...');
+      setLoadingMessage('Step 3/3: Assembling final subtitle file...');
       
       if (allSubtitles.length === 0) {
         throw new Error("The AI model did not return any valid translations. The audio may be silent or contain no clear speech.");

@@ -1,4 +1,3 @@
-
 import type { AudioChunkData } from '../types';
 
 // Helper to convert a Blob to a base64 string
@@ -58,6 +57,9 @@ function encodeWav(samples: Float32Array, sampleRate: number): Blob {
 // Extracts audio from a video/audio file, chunks it, and encodes it to WAV format.
 export function extractAudioChunks(file: File, chunkDuration: number): Promise<AudioChunkData[]> {
   return new Promise(async (resolve, reject) => {
+    // A reasonable threshold for silence detection. Audio sample values are normalized between -1.0 and 1.0.
+    const SILENCE_THRESHOLD = 0.01;
+    
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     const chunks: AudioChunkData[] = [];
 
@@ -72,6 +74,9 @@ export function extractAudioChunks(file: File, chunkDuration: number): Promise<A
           const endTime = Math.min(startTime + chunkDuration, totalDuration);
           const currentDuration = endTime - startTime;
 
+          // Skip chunks that are too short to be meaningful
+          if (currentDuration < 0.1) continue;
+
           const startOffset = Math.floor(startTime * sampleRate);
           const endOffset = Math.floor(endTime * sampleRate);
           const frameCount = endOffset - startOffset;
@@ -83,6 +88,21 @@ export function extractAudioChunks(file: File, chunkDuration: number): Promise<A
               for (let i = 0; i < channelData.length; i++) {
                   monoChannel[i] += channelData[i] / audioBuffer.numberOfChannels;
               }
+          }
+
+          // --- Silence Detection ---
+          let isSilent = true;
+          for (let i = 0; i < monoChannel.length; i++) {
+            // If any sample's absolute amplitude is above the threshold, it's not silent
+            if (Math.abs(monoChannel[i]) > SILENCE_THRESHOLD) {
+              isSilent = false;
+              break;
+            }
+          }
+
+          // If the chunk is considered silent, skip to the next one
+          if (isSilent) {
+            continue;
           }
           
           const wavBlob = encodeWav(monoChannel, sampleRate);
