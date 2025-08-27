@@ -1,0 +1,5 @@
+{
+  "name": "AI Video Subtitle Generator",
+  "description": "An AI-powered tool to generate descriptive Chinese subtitles for videos. Upload a video, and the application will analyze its frames to create subtitles describing the visual content.",
+  "requestFramePermissions": []
+}
