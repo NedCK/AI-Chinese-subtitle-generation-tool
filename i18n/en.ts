@@ -1,0 +1,21 @@
+
+export const en = {
+  title: 'AI Video Translator',
+  subtitle: 'Upload a video to transcribe its audio and translate it into Chinese subtitles.',
+  uploadTitle: '1. Upload Video',
+  changeFile: 'Change File',
+  selectFile: 'Select a Video/Audio File',
+  selectedFile: 'Selected: {fileName}',
+  videoPreview: 'Video preview will appear here',
+  generateButton: '2. Generate Subtitles',
+  generatingButton: 'Generating...',
+  subtitlesTitle: '3. Get Subtitles',
+  subtitlesPreview: 'Generated subtitles will appear here.',
+  copyButton: 'Copy to Clipboard',
+  copiedButton: 'Copied!',
+  errorTitle: 'An Error Occurred',
+  errorInvalidFile: 'Please select a valid video or audio file.',
+  loadingStep1: 'Step 1/3: Analyzing and splitting audio file...',
+  loadingStep2: 'Step 2/3: Processing audio chunk {current} of {total}...',
+  loadingStep3: 'Step 3/3: Assembling final subtitle file...',
+};

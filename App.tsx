@@ -6,8 +6,11 @@ import { formatSrt, formatTimestamp } from './utils/formatters';
 import type { SubtitleEntry, AudioChunkData } from './types';
 import { FileVideo, Film, CheckCircle, AlertTriangle } from './components/Icons';
 import { Spinner } from './components/Spinner';
+import { useTranslation } from './i18n';
 
 const App: React.FC = () => {
+  const { t, language, setLanguage } = useTranslation();
+
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string>('');
   const [subtitles, setSubtitles] = useState<string>('');
@@ -18,7 +21,7 @@ const App: React.FC = () => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file && (file.type.startsWith('video/') || file.type.startsWith('audio/'))) {
       setVideoFile(file);
@@ -28,11 +31,11 @@ const App: React.FC = () => {
       setError(null);
       setIsCopied(false);
     } else {
-      setError('Please select a valid video or audio file.');
+      setError(t('errorInvalidFile'));
       setVideoFile(null);
       setVideoUrl('');
     }
-  };
+  }, [t]);
 
   const handleGenerateClick = useCallback(async () => {
     if (!videoFile) return;
@@ -43,7 +46,7 @@ const App: React.FC = () => {
     setIsCopied(false);
 
     try {
-      setLoadingMessage('Step 1/3: Analyzing and splitting audio file...');
+      setLoadingMessage(t('loadingStep1'));
       const audioChunks: AudioChunkData[] = await extractAudioChunks(videoFile, 15); // 15-second chunks
 
       if (audioChunks.length === 0) {
@@ -53,7 +56,7 @@ const App: React.FC = () => {
       let allSubtitles: SubtitleEntry[] = [];
       for (let i = 0; i < audioChunks.length; i++) {
           const chunk = audioChunks[i];
-          setLoadingMessage(`Step 2/3: Processing audio chunk ${i + 1} of ${audioChunks.length}...`);
+          setLoadingMessage(t('loadingStep2', { current: i + 1, total: audioChunks.length }));
           
           const translatedText = await generateSubtitleForChunk(chunk);
 
@@ -67,7 +70,7 @@ const App: React.FC = () => {
           }
       }
       
-      setLoadingMessage('Step 3/3: Assembling final subtitle file...');
+      setLoadingMessage(t('loadingStep3'));
       
       if (allSubtitles.length === 0) {
         throw new Error("The AI model did not return any valid translations. The audio may be silent or contain no clear speech.");
@@ -87,7 +90,7 @@ const App: React.FC = () => {
       setIsLoading(false);
       setLoadingMessage('');
     }
-  }, [videoFile]);
+  }, [videoFile, t]);
 
   const handleCopy = () => {
     if(subtitles) {
@@ -97,25 +100,48 @@ const App: React.FC = () => {
     }
   };
 
+  const LanguageSwitcher = () => (
+    <div className="absolute top-0 right-0 flex items-center space-x-1 p-2">
+      <button
+        onClick={() => setLanguage('en')}
+        className={`px-3 py-1 text-sm rounded-md transition-colors ${
+          language === 'en' ? 'text-white bg-brand-blue' : 'text-gray-400 hover:bg-gray-700'
+        }`}
+      >
+        English
+      </button>
+      <span className="text-gray-600">|</span>
+      <button
+        onClick={() => setLanguage('zh')}
+        className={`px-3 py-1 text-sm rounded-md transition-colors ${
+          language === 'zh' ? 'text-white bg-brand-blue' : 'text-gray-400 hover:bg-gray-700'
+        }`}
+      >
+        简体中文
+      </button>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans">
       <main className="container mx-auto px-4 py-8 md:py-12">
-        <header className="text-center mb-10">
-          <div className="flex justify-center items-center gap-4 mb-2">
+        <header className="relative text-center mb-10">
+          <LanguageSwitcher />
+          <div className="flex justify-center items-center gap-4 mb-2 pt-8 md:pt-0">
             <Film className="w-10 h-10 text-brand-blue" />
             <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-300">
-              AI Video Translator
+              {t('title')}
             </h1>
           </div>
           <p className="text-lg text-gray-400 max-w-2xl mx-auto">
-            Upload a video to transcribe its audio and translate it into Chinese subtitles.
+            {t('subtitle')}
           </p>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column: Upload and Preview */}
           <div className="bg-gray-800/50 rounded-2xl p-6 shadow-2xl border border-gray-700">
-            <h2 className="text-2xl font-semibold mb-4 text-white">1. Upload Video</h2>
+            <h2 className="text-2xl font-semibold mb-4 text-white">{t('uploadTitle')}</h2>
             
             <input
               type="file"
@@ -129,11 +155,11 @@ const App: React.FC = () => {
               className="w-full flex items-center justify-center gap-3 bg-brand-blue hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-lg transition-all duration-300 transform hover:scale-105"
             >
               <FileVideo className="w-6 h-6" />
-              <span>{videoFile ? 'Change File' : 'Select a Video/Audio File'}</span>
+              <span>{videoFile ? t('changeFile') : t('selectFile')}</span>
             </button>
             
             {videoFile && (
-               <p className="text-sm text-center mt-3 text-gray-400 truncate">Selected: {videoFile.name}</p>
+               <p className="text-sm text-center mt-3 text-gray-400 truncate">{t('selectedFile', { fileName: videoFile.name })}</p>
             )}
 
             <div className="mt-6 aspect-video bg-black rounded-lg overflow-hidden border-2 border-gray-700">
@@ -142,7 +168,7 @@ const App: React.FC = () => {
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center text-gray-500">
                   <Film className="w-16 h-16 mb-2" />
-                  <p>Video preview will appear here</p>
+                  <p>{t('videoPreview')}</p>
                 </div>
               )}
             </div>
@@ -155,17 +181,17 @@ const App: React.FC = () => {
               {isLoading ? (
                 <>
                   <Spinner />
-                  <span>Generating...</span>
+                  <span>{t('generatingButton')}</span>
                 </>
               ) : (
-                '2. Generate Subtitles'
+                t('generateButton')
               )}
             </button>
           </div>
 
           {/* Right Column: Subtitles Display */}
           <div className="bg-gray-800/50 rounded-2xl p-6 shadow-2xl border border-gray-700 flex flex-col">
-            <h2 className="text-2xl font-semibold mb-4 text-white">3. Get Subtitles</h2>
+            <h2 className="text-2xl font-semibold mb-4 text-white">{t('subtitlesTitle')}</h2>
             <div className="flex-grow bg-gray-900 rounded-lg p-4 relative overflow-hidden h-96 lg:h-auto">
               {isLoading && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/80 z-10">
@@ -176,7 +202,7 @@ const App: React.FC = () => {
               {error && (
                  <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
                   <AlertTriangle className="w-12 h-12 text-red-500 mb-4"/>
-                  <p className="text-red-400 font-semibold">An Error Occurred</p>
+                  <p className="text-red-400 font-semibold">{t('errorTitle')}</p>
                   <p className="text-red-400 text-sm">{error}</p>
                 </div>
               )}
@@ -192,13 +218,13 @@ const App: React.FC = () => {
                     className="mt-4 w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                   >
                     {isCopied ? <CheckCircle className="w-5 h-5 text-green-400"/> : null}
-                    {isCopied ? 'Copied!' : 'Copy to Clipboard'}
+                    {isCopied ? t('copiedButton') : t('copyButton')}
                   </button>
                 </div>
               )}
               {!isLoading && !error && !subtitles && (
                 <div className="w-full h-full flex flex-col items-center justify-center text-gray-500">
-                  <p>Generated subtitles will appear here.</p>
+                  <p>{t('subtitlesPreview')}</p>
                 </div>
               )}
             </div>

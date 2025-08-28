@@ -1,0 +1,21 @@
+
+export const zh = {
+  title: 'AI 视频翻译器',
+  subtitle: '上传视频，将其音频转录并翻译成中文字幕。',
+  uploadTitle: '1. 上传视频',
+  changeFile: '更换文件',
+  selectFile: '选择视频/音频文件',
+  selectedFile: '已选择: {fileName}',
+  videoPreview: '视频预览将在此处显示',
+  generateButton: '2. 生成字幕',
+  generatingButton: '生成中...',
+  subtitlesTitle: '3. 获取字幕',
+  subtitlesPreview: '生成的字幕将在此处显示。',
+  copyButton: '复制到剪贴板',
+  copiedButton: '已复制!',
+  errorTitle: '发生错误',
+  errorInvalidFile: '请选择一个有效的视频或音频文件。',
+  loadingStep1: '第 1/3 步: 分析并分割音频文件...',
+  loadingStep2: '第 2/3 步: 处理音频块 {current} / {total}...',
+  loadingStep3: '第 3/3 步: 组合最终字幕文件...',
+};
