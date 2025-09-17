@@ -23,19 +23,28 @@ const App: React.FC = () => {
 
   const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+
+    // Clean slate for the new selection by revoking the old URL and resetting states.
+    if (videoUrl) {
+      URL.revokeObjectURL(videoUrl);
+    }
+    setSubtitles('');
+    setError(null);
+    setIsCopied(false);
+
     if (file && (file.type.startsWith('video/') || file.type.startsWith('audio/'))) {
       setVideoFile(file);
       const url = URL.createObjectURL(file);
       setVideoUrl(url);
-      setSubtitles('');
-      setError(null);
-      setIsCopied(false);
     } else {
-      setError(t('errorInvalidFile'));
       setVideoFile(null);
       setVideoUrl('');
+      // Only show an error if an invalid file type was actually selected.
+      if (file) {
+        setError(t('errorInvalidFile'));
+      }
     }
-  }, [t]);
+  }, [t, videoUrl]);
 
   const handleGenerateClick = useCallback(async () => {
     if (!videoFile) return;
