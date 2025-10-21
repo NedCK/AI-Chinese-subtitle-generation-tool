@@ -49,58 +49,55 @@ const workerCode = `
   }
 
   // --- Main Extraction Logic ---
-  async function extract(file, chunkDuration) {
+  async function extract(audioData, chunkDuration) {
     const SILENCE_THRESHOLD = 0.01;
-    // In a worker, 'self' is used instead of 'window'
-    const audioContext = new (self.AudioContext || self.webkitAudioContext)();
     const chunks = [];
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      const totalDuration = audioBuffer.duration;
-      const sampleRate = audioBuffer.sampleRate;
+    
+    const { channels, sampleRate, numberOfChannels, duration: totalDuration } = audioData;
 
-      for (let startTime = 0; startTime < totalDuration; startTime += chunkDuration) {
-        const endTime = Math.min(startTime + chunkDuration, totalDuration);
-        const currentDuration = endTime - startTime;
-        if (currentDuration < 0.1) continue;
+    const getChannelData = (c) => channels[c];
 
-        const startOffset = Math.floor(startTime * sampleRate);
-        const endOffset = Math.floor(endTime * sampleRate);
-        const frameCount = endOffset - startOffset;
+    for (let startTime = 0; startTime < totalDuration; startTime += chunkDuration) {
+      const endTime = Math.min(startTime + chunkDuration, totalDuration);
+      const currentDuration = endTime - startTime;
+      if (currentDuration < 0.1) continue;
 
-        const monoChannel = new Float32Array(frameCount);
-        for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
-          const channelData = audioBuffer.getChannelData(c).subarray(startOffset, endOffset);
-          for (let i = 0; i < channelData.length; i++) {
-            monoChannel[i] += channelData[i] / audioBuffer.numberOfChannels;
-          }
+      const startOffset = Math.floor(startTime * sampleRate);
+      const endOffset = Math.floor(endTime * sampleRate);
+      const frameCount = endOffset - startOffset;
+
+      if (frameCount <= 0) continue;
+
+      const monoChannel = new Float32Array(frameCount);
+      for (let c = 0; c < numberOfChannels; c++) {
+        const channelData = getChannelData(c).subarray(startOffset, endOffset);
+        for (let i = 0; i < channelData.length; i++) {
+          monoChannel[i] += channelData[i] / numberOfChannels;
         }
-
-        let isSilent = true;
-        for (let i = 0; i < monoChannel.length; i++) {
-          if (Math.abs(monoChannel[i]) > SILENCE_THRESHOLD) {
-            isSilent = false;
-            break;
-          }
-        }
-        if (isSilent) continue;
-
-        const wavBlob = encodeWav(monoChannel, sampleRate);
-        const base64 = await blobToBase64(wavBlob);
-        chunks.push({ startTime, duration: currentDuration, base64 });
       }
-      return chunks;
-    } finally {
-      audioContext.close();
+
+      let isSilent = true;
+      for (let i = 0; i < monoChannel.length; i++) {
+        if (Math.abs(monoChannel[i]) > SILENCE_THRESHOLD) {
+          isSilent = false;
+          break;
+        }
+      }
+      if (isSilent) continue;
+
+      const wavBlob = encodeWav(monoChannel, sampleRate);
+      const base64 = await blobToBase64(wavBlob);
+      chunks.push({ startTime, duration: currentDuration, base64 });
     }
+    return chunks;
   }
 
   // --- Worker Event Listener ---
   self.onmessage = async (event) => {
-    const { file, chunkDuration } = event.data;
+    const { channels, sampleRate, numberOfChannels, duration, chunkDuration } = event.data;
     try {
-      const chunks = await extract(file, chunkDuration);
+      const audioData = { channels, sampleRate, numberOfChannels, duration };
+      const chunks = await extract(audioData, chunkDuration);
       self.postMessage({ type: 'result', chunks });
     } catch (e) {
       const error = e instanceof Error ? e : new Error('Worker failed to process audio.');
@@ -117,32 +114,55 @@ const workerCode = `
  * @param chunkDuration The desired duration of each audio chunk in seconds.
  * @returns A promise that resolves with an array of audio chunk data.
  */
-export function extractAudioChunks(file: File, chunkDuration: number): Promise<AudioChunkData[]> {
-  return new Promise((resolve, reject) => {
-    const blob = new Blob([workerCode], { type: 'application/javascript' });
-    const workerUrl = URL.createObjectURL(blob);
-    const worker = new Worker(workerUrl);
+export async function extractAudioChunks(file: File, chunkDuration: number): Promise<AudioChunkData[]> {
+  // Fix: Cast window to 'any' to access 'webkitAudioContext' for older browser compatibility, resolving a TypeScript type error.
+  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-    const cleanup = () => {
-      worker.terminate();
-      URL.revokeObjectURL(workerUrl);
-    };
+    return new Promise((resolve, reject) => {
+      const blob = new Blob([workerCode], { type: 'application/javascript' });
+      const workerUrl = URL.createObjectURL(blob);
+      const worker = new Worker(workerUrl);
 
-    worker.onmessage = (event: MessageEvent<{ type: 'result' | 'error', chunks?: AudioChunkData[], message?: string }>) => {
-      if (event.data.type === 'result' && event.data.chunks) {
-        resolve(event.data.chunks);
-      } else if (event.data.type === 'error') {
-        reject(new Error(event.data.message || 'An unknown error occurred in the audio worker.'));
+      const cleanup = () => {
+        worker.terminate();
+        URL.revokeObjectURL(workerUrl);
+      };
+
+      worker.onmessage = (event: MessageEvent<{ type: 'result' | 'error', chunks?: AudioChunkData[], message?: string }>) => {
+        if (event.data.type === 'result' && event.data.chunks) {
+          resolve(event.data.chunks);
+        } else if (event.data.type === 'error') {
+          reject(new Error(event.data.message || 'An unknown error occurred in the audio worker.'));
+        }
+        cleanup();
+      };
+
+      worker.onerror = (error) => {
+        console.error('Error in audio worker:', error);
+        reject(new Error('Failed to process audio in the background. The file may be unsupported or corrupted.'));
+        cleanup();
+      };
+
+      const channels = [];
+      for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+          channels.push(audioBuffer.getChannelData(i));
       }
-      cleanup();
-    };
 
-    worker.onerror = (error) => {
-      console.error('Error in audio worker:', error);
-      reject(new Error('Failed to process audio in the background. The file may be unsupported or corrupted.'));
-      cleanup();
-    };
+      const transferable = channels.map(channel => channel.buffer);
 
-    worker.postMessage({ file, chunkDuration });
-  });
+      worker.postMessage({
+          channels,
+          sampleRate: audioBuffer.sampleRate,
+          numberOfChannels: audioBuffer.numberOfChannels,
+          duration: audioBuffer.duration,
+          chunkDuration,
+      }, transferable);
+    });
+  } finally {
+      audioContext.close();
+  }
 }

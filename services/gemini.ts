@@ -28,6 +28,10 @@ export async function generateSubtitleForChunk(chunk: AudioChunkData): Promise<s
   }
   
   try {
+    const textPart = {
+      text: prompt,
+    };
+    
     const audioPart = {
       inlineData: {
         mimeType: 'audio/wav',
@@ -37,12 +41,7 @@ export async function generateSubtitleForChunk(chunk: AudioChunkData): Promise<s
 
     const response = await ai.models.generateContent({
       model: model,
-      contents: [{ // Wrap contents in an array
-        parts: [
-          { text: prompt },
-          audioPart
-        ]
-      }],
+      contents: [{ parts: [textPart, audioPart] }],
     });
 
     return response.text?.trim() || "";
